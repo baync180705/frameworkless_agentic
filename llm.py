@@ -22,12 +22,14 @@ class DeepSeekLLMClient:
         self,
         messages: List[Dict[str, str]],
         tools: List[Dict[str, Any]] | None = None,
+        stream: bool = False
     ):
         response = client.chat.completions.create(
             model=self.model,
             messages=messages,
             tools=tools,
             tool_choice="auto" if tools else None,
+            stream=stream
         )
 
         return response

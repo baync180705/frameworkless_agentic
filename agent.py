@@ -14,17 +14,26 @@ Stop when the task is complete.
 def run_agent(messages: list, MAX_STEPS: int = 10):
 
     for _ in range(MAX_STEPS):
-        response = llm.call(messages, tools=TOOLS_SCHEMA)
+        stream = llm.call(messages, tools=TOOLS_SCHEMA, stream=True)
 
-        message = response.choices[0].message
+        tool_call = None
+        final_text = ""
 
-        if message.tool_calls:
-            call = message.tool_calls[0]
-            tool_name = call.function.name
-            tool_args = json.loads(call.function.arguments)
+        for event in stream:
+            delta = event.choices[0].delta
 
-            if tool_name not in TOOLS:
-                raise RuntimeError(f"Unknown tool: {tool_name}")
+            if delta.tool_calls:
+                tool_call = delta.tool_calls[0]
+
+            if delta.content:
+                print(delta.content, end="", flush=True)
+                final_text += delta.content
+
+        print()
+
+        if tool_call:
+            tool_name = tool_call.function.name
+            tool_args = json.loads(tool_call.function.arguments)
 
             result = TOOLS[tool_name](**tool_args)
 
@@ -32,16 +41,14 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
 
             messages.append({
                 "role": "tool",
-                "tool_call_id": call.id,
-                "content": str(result)
+                "tool_call_id": tool_call.id,
+                "content": str(result),
             })
 
-        elif message.content:
-            print(message.content)
-
+        elif final_text:
             messages.append({
                 "role": "assistant",
-                "content": message.content
+                "content": final_text,
             })
             break
 
