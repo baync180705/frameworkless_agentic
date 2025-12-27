@@ -19,45 +19,37 @@ class GeminiLLMClient:
         tools: List[Dict[str, Any]] | None = None,
     ):
         contents = self._convert_messages(messages)
+        config = None
+        if tools:
+            config = types.GenerateContentConfig(tools=tools)
 
         response = client.models.generate_content(
             contents=contents,
             model=self.model,
-            config=types.GenerateContentConfig(
-                tools=tools
-    )
+            config=config
         )
-
-        # decision  = self._parse_gemini_response(response)
-
+        
         return response
 
-    def _convert_messages(self, messages):
+    @staticmethod
+    def _convert_messages(messages):
         contents = []
-        system_prefix = ""
 
         for msg in messages:
-            if msg["role"] == "system":
-                system_prefix += msg["content"] + "\n\n"
+            if msg["role"] == "assistant":
+                role = "model"
             else:
-                if system_prefix:
-                    contents.append(
-                        {
-                            "role": "user",
-                            "parts": [{"text": system_prefix + msg["content"]}],
-                        }
-                    )
-                    system_prefix = ""
-                else:
-                    contents.append(
-                        {
-                            "role": msg["role"],
-                            "parts": [{"text": msg["content"]}],
-                        }
-                    )
+                role = "user"
 
+            contents.append(
+                {
+                    "role": role,
+                    "parts": [{"text": msg["content"]}],
+                }
+            )
         return contents
     
+    @staticmethod
     def _parse_gemini_response(response):
         candidate = response.candidates[0]
         parts = candidate.content.parts
