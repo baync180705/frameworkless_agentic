@@ -15,7 +15,7 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
 
     for _ in range(MAX_STEPS):
         stream = llm.call(messages, tools=TOOLS_SCHEMA, stream=True)
-
+        
         tool_call = None
         final_text = ""
 
@@ -31,12 +31,29 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
 
         print()
 
-        if tool_call:
+        if tool_call and tool_call.function.name:
             tool_name = tool_call.function.name
-            tool_args = json.loads(tool_call.function.arguments)
+
+            if tool_name == "ask_user":
+                question = tool_args["question"]
+                user_answer = input(f"\n{question}\nYou: ")
+
+                messages.append({
+                    "role": "user",
+                    "content": user_answer
+                })
+                continue
+
+            raw_args = tool_call.function.arguments
+            if raw_args and raw_args.strip():
+                try:
+                    tool_args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    tool_args = {}
+            else:
+                tool_args = {}
 
             result = TOOLS[tool_name](**tool_args)
-
             print(f"\nTool `{tool_name}` output:\n{result}\n")
 
             messages.append({
@@ -50,7 +67,7 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
                 "role": "assistant",
                 "content": final_text,
             })
-            break
+            continue
 
         else:
             raise RuntimeError("Unhandled response type")
