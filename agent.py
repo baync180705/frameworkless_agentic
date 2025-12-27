@@ -1,8 +1,9 @@
-from llm import GeminiLLMClient
+import json
+from llm import DeepSeekLLMClient
 from schema import TOOLS_SCHEMA
 from tools import TOOLS
 
-llm: GeminiLLMClient = GeminiLLMClient()
+llm: DeepSeekLLMClient = DeepSeekLLMClient()
 
 SYSTEM_PROMPT: str = """
 You are an autonomous agent.
@@ -14,11 +15,13 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
 
     for _ in range(MAX_STEPS):
         response = llm.call(messages, tools=TOOLS_SCHEMA)
-        part = response.candidates[0].content.parts[0]
 
-        if part.function_call:
-            tool_name = part.function_call.name
-            tool_args = dict(part.function_call.args or {})
+        message = response.choices[0].message
+
+        if message.tool_calls:
+            call = message.tool_calls[0]
+            tool_name = call.function.name
+            tool_args = json.loads(call.function.arguments)
 
             if tool_name not in TOOLS:
                 raise RuntimeError(f"Unknown tool: {tool_name}")
@@ -29,16 +32,17 @@ def run_agent(messages: list, MAX_STEPS: int = 10):
 
             messages.append({
                 "role": "tool",
+                "tool_call_id": call.id,
                 "content": str(result)
             })
 
-        elif part.text:
+        elif message.content:
+            print(message.content)
+
             messages.append({
                 "role": "assistant",
-                "content": part.text
+                "content": message.content
             })
-
-            print(part.text)
             break
 
         else:
